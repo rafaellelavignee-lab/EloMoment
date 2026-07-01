@@ -1,0 +1,304 @@
+-- elomoment: schema Postgres + RLS + realtime, substituindo Firestore/Storage rules.
+-- Rode isto inteiro no SQL Editor do seu projeto Supabase (uma vez).
+
+create extension if not exists pgcrypto;
+
+-- ============================================================
+-- TABELAS
+-- ============================================================
+
+create table if not exists public.users (
+  uid uuid primary key references auth.users (id) on delete cascade,
+  name text not null,
+  photo_url text,
+  birthdate text,
+  phrase text,
+  favorite_emoji text,
+  favorite_color text,
+  role text not null check (role in ('guest', 'host', 'debutante')),
+  created_at bigint not null
+);
+
+create table if not exists public.invites (
+  code text primary key,
+  role text not null check (role in ('guest', 'host', 'debutante')),
+  single_use boolean not null default true,
+  used boolean not null default false,
+  used_by uuid references public.users (uid),
+  created_at bigint not null
+);
+
+create table if not exists public.posts (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.users (uid),
+  text text not null default '',
+  media_url text,
+  media_type text,
+  location text default '',
+  hashtags text[] not null default '{}',
+  pinned boolean not null default false,
+  created_at bigint not null,
+  reactions jsonb not null default '{}'::jsonb
+);
+
+create table if not exists public.comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.posts (id) on delete cascade,
+  author_id uuid not null references public.users (uid),
+  text text not null,
+  created_at bigint not null,
+  likes uuid[] not null default '{}',
+  reply_to uuid
+);
+
+create table if not exists public.stories (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.users (uid),
+  media_url text,
+  media_type text,
+  text text default '',
+  text_color text default '#FFFFFF',
+  created_at bigint not null,
+  expires_at bigint not null
+);
+
+create table if not exists public.mural_messages (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.users (uid),
+  text text not null,
+  created_at bigint not null,
+  x real not null,
+  y real not null
+);
+
+create table if not exists public.guestbook_entries (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.users (uid),
+  message text not null,
+  emoji text,
+  signature_data_url text,
+  photo_url text,
+  created_at bigint not null
+);
+
+create table if not exists public.timeline_moments (
+  id uuid primary key default gen_random_uuid(),
+  time text not null,
+  title text not null,
+  description text,
+  "order" int not null default 0
+);
+
+create table if not exists public.announcements (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.users (uid),
+  text text not null,
+  created_at bigint not null
+);
+
+create table if not exists public.chats (
+  id uuid primary key default gen_random_uuid(),
+  members uuid[] not null default '{}',
+  is_group boolean not null default false,
+  name text default '',
+  photo_url text,
+  last_message jsonb,
+  created_at bigint not null
+);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  chat_id uuid not null references public.chats (id) on delete cascade,
+  sender_id uuid not null references public.users (uid),
+  text text default '',
+  media_url text,
+  media_type text,
+  reply_to uuid,
+  created_at bigint not null,
+  read_by uuid[] not null default '{}'
+);
+
+-- ============================================================
+-- HELPERS
+-- ============================================================
+
+create or replace function public.my_role()
+returns text
+language sql
+security definer
+stable
+as $$
+  select role from public.users where uid = auth.uid();
+$$;
+
+create or replace function public.is_host()
+returns boolean language sql security definer stable as $$
+  select public.my_role() = 'host';
+$$;
+
+create or replace function public.is_debutante()
+returns boolean language sql security definer stable as $$
+  select public.my_role() = 'debutante';
+$$;
+
+create or replace function public.is_staff()
+returns boolean language sql security definer stable as $$
+  select public.is_host() or public.is_debutante();
+$$;
+
+-- ============================================================
+-- RLS
+-- ============================================================
+
+alter table public.users enable row level security;
+alter table public.invites enable row level security;
+alter table public.posts enable row level security;
+alter table public.comments enable row level security;
+alter table public.stories enable row level security;
+alter table public.mural_messages enable row level security;
+alter table public.guestbook_entries enable row level security;
+alter table public.timeline_moments enable row level security;
+alter table public.announcements enable row level security;
+alter table public.chats enable row level security;
+alter table public.messages enable row level security;
+
+-- users
+create policy "users_select_authenticated" on public.users
+  for select using (auth.uid() is not null);
+create policy "users_insert_self" on public.users
+  for insert with check (auth.uid() = uid);
+create policy "users_update_self_or_host" on public.users
+  for update using (auth.uid() = uid or public.is_host());
+create policy "users_delete_host" on public.users
+  for delete using (public.is_host());
+
+-- invites: leitura pública por código (validação de link); listagem só host
+create policy "invites_select_public" on public.invites
+  for select using (true);
+create policy "invites_insert_host" on public.invites
+  for insert with check (public.is_host());
+create policy "invites_delete_host" on public.invites
+  for delete using (public.is_host());
+-- consumo: qualquer usuário autenticado marca como usado, uma vez, para si mesmo
+create policy "invites_update_consume" on public.invites
+  for update using (used = false)
+  with check (used = true and used_by = auth.uid());
+
+-- posts
+create policy "posts_select_authenticated" on public.posts
+  for select using (auth.uid() is not null);
+create policy "posts_insert_own" on public.posts
+  for insert with check (author_id = auth.uid());
+create policy "posts_update_own_or_host" on public.posts
+  for update using (author_id = auth.uid() or public.is_host());
+create policy "posts_delete_own_or_host" on public.posts
+  for delete using (author_id = auth.uid() or public.is_host());
+
+-- comments
+create policy "comments_select_authenticated" on public.comments
+  for select using (auth.uid() is not null);
+create policy "comments_insert_own" on public.comments
+  for insert with check (author_id = auth.uid());
+create policy "comments_update_authenticated" on public.comments
+  for update using (auth.uid() is not null);
+create policy "comments_delete_own_or_host" on public.comments
+  for delete using (author_id = auth.uid() or public.is_host());
+
+-- stories
+create policy "stories_select_authenticated" on public.stories
+  for select using (auth.uid() is not null);
+create policy "stories_insert_own" on public.stories
+  for insert with check (author_id = auth.uid());
+create policy "stories_delete_own_or_host" on public.stories
+  for delete using (author_id = auth.uid() or public.is_host());
+
+-- mural
+create policy "mural_select_authenticated" on public.mural_messages
+  for select using (auth.uid() is not null);
+create policy "mural_insert_own" on public.mural_messages
+  for insert with check (author_id = auth.uid());
+create policy "mural_delete_own_or_host" on public.mural_messages
+  for delete using (author_id = auth.uid() or public.is_host());
+
+-- guestbook
+create policy "guestbook_select_authenticated" on public.guestbook_entries
+  for select using (auth.uid() is not null);
+create policy "guestbook_insert_own" on public.guestbook_entries
+  for insert with check (author_id = auth.uid());
+create policy "guestbook_delete_host" on public.guestbook_entries
+  for delete using (public.is_host());
+
+-- timeline
+create policy "timeline_select_authenticated" on public.timeline_moments
+  for select using (auth.uid() is not null);
+create policy "timeline_write_staff" on public.timeline_moments
+  for all using (public.is_staff()) with check (public.is_staff());
+
+-- announcements
+create policy "announcements_select_authenticated" on public.announcements
+  for select using (auth.uid() is not null);
+create policy "announcements_write_staff" on public.announcements
+  for all using (public.is_staff()) with check (public.is_staff());
+
+-- chats
+create policy "chats_select_member" on public.chats
+  for select using (auth.uid() = any(members));
+create policy "chats_insert_member" on public.chats
+  for insert with check (auth.uid() = any(members));
+create policy "chats_update_member" on public.chats
+  for update using (auth.uid() = any(members));
+
+-- messages
+create policy "messages_select_member" on public.messages
+  for select using (
+    exists (select 1 from public.chats c where c.id = chat_id and auth.uid() = any(c.members))
+  );
+create policy "messages_insert_member" on public.messages
+  for insert with check (
+    sender_id = auth.uid()
+    and exists (select 1 from public.chats c where c.id = chat_id and auth.uid() = any(c.members))
+  );
+create policy "messages_delete_own" on public.messages
+  for delete using (sender_id = auth.uid());
+
+-- ============================================================
+-- REALTIME
+-- ============================================================
+
+alter publication supabase_realtime add table
+  public.users, public.posts, public.comments, public.stories,
+  public.mural_messages, public.guestbook_entries, public.timeline_moments,
+  public.announcements, public.chats, public.messages;
+
+-- ============================================================
+-- STORAGE (buckets + policies)
+-- ============================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('media', 'media', true, 52428800, array['image/*', 'video/*', 'audio/*'])
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 8388608, array['image/*'])
+on conflict (id) do nothing;
+
+create policy "media_read_authenticated" on storage.objects
+  for select using (bucket_id = 'media' and auth.uid() is not null);
+create policy "media_write_own_folder" on storage.objects
+  for insert with check (
+    bucket_id = 'media' and auth.uid() is not null
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "avatars_read_authenticated" on storage.objects
+  for select using (bucket_id = 'avatars' and auth.uid() is not null);
+create policy "avatars_write_own_file" on storage.objects
+  for insert with check (
+    bucket_id = 'avatars' and auth.uid() is not null
+    and name = auth.uid()::text
+  );
+create policy "avatars_update_own_file" on storage.objects
+  for update using (
+    bucket_id = 'avatars' and auth.uid() is not null
+    and name = auth.uid()::text
+  );

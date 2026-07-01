@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+html, body, #root { height: 100%; }
+
+body {
+  @apply bg-navy text-mist font-body antialiased;
+  background: radial-gradient(ellipse at 30% -10%, #193B7D 0%, #0E1F4D 45%, #071330 100%);
+  background-attachment: fixed;
+}
+
+/* Tema claro: amanhecer lunar */
+html:not(.dark) body {
+  @apply text-night;
+  background: radial-gradient(ellipse at 30% -10%, #E7EAF2 0%, #cfd8ee 55%, #b9c6e6 100%);
+}
+
+@layer components {
+  .glass {
+    @apply rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-glass;
+  }
+  html:not(.dark) .glass {
+    @apply border-night/10 bg-white/60;
+  }
+  .btn-star {
+    @apply rounded-full bg-star px-6 py-3 font-semibold text-navy shadow-glow
+           transition-transform duration-200 hover:scale-[1.03] active:scale-95;
+  }
+  .btn-ghost {
+    @apply rounded-full border border-star/40 px-6 py-3 text-star
+           transition-colors hover:bg-star/10;
+  }
+  .input-night {
+    @apply w-full rounded-xl border border-white/15 bg-navy/60 px-4 py-3 text-mist
+           placeholder:text-mist/40 outline-none focus:border-star/60;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: #193B7D; border-radius: 8px; }

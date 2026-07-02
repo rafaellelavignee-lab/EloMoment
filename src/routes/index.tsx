@@ -4,6 +4,7 @@ import AppLayout from "@/layouts/AppLayout";
 import Landing from "@/pages/Landing";
 import InvitePage from "@/pages/InvitePage";
 import LoginPage from "@/pages/LoginPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import FeedPage from "@/pages/FeedPage";
 import AlbumPage from "@/pages/AlbumPage";
 import TimelinePage from "@/pages/TimelinePage";
@@ -29,6 +30,7 @@ function Protected() {
 export const router = createBrowserRouter([
   { path: "/", element: <Landing /> },
   { path: "/login", element: <LoginPage /> },
+  { path: "/redefinir-senha", element: <ResetPasswordPage /> },
   { path: "/invite/:code", element: <InvitePage /> },
   {
     element: <Protected />,

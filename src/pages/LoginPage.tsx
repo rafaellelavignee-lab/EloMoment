@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import StarField from "@/components/sky/StarField";
-import { loginWithPassword } from "@/services/auth";
+import { loginWithPassword, requestPasswordReset } from "@/services/auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [sending, setSending] = useState(false);
 
   async function submit() {
@@ -19,11 +20,31 @@ export default function LoginPage() {
     }
     setSending(true);
     setError("");
+    setInfo("");
     try {
       await loginWithPassword(email.trim(), password);
       navigate("/app", { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível entrar. Confira e-mail e senha.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function forgotPassword() {
+    if (sending) return;
+    if (!email.trim()) {
+      setError("Digite seu e-mail acima primeiro, depois clique em \"Esqueci minha senha\".");
+      return;
+    }
+    setSending(true);
+    setError("");
+    setInfo("");
+    try {
+      await requestPasswordReset(email.trim());
+      setInfo("Te mandamos um link no e-mail pra você criar uma senha nova.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível enviar o e-mail de redefinição.");
     } finally {
       setSending(false);
     }
@@ -60,9 +81,13 @@ export default function LoginPage() {
         />
 
         {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
+        {info && <p className="mt-4 text-sm text-emerald-300">{info}</p>}
 
         <button onClick={submit} disabled={sending} className="btn-star mt-6 w-full disabled:opacity-50">
           {sending ? "Entrando…" : "Entrar"}
+        </button>
+        <button onClick={forgotPassword} disabled={sending} className="mt-3 w-full text-center text-xs text-mist/60 underline disabled:opacity-50">
+          Esqueci minha senha
         </button>
         <button onClick={() => navigate("/")} className="btn-ghost mt-3 w-full">
           Voltar ao início

@@ -25,27 +25,20 @@ create table if not exists public.invites (
   single_use boolean not null default true,
   used boolean not null default false,
   -- referencia auth.users (não public.users): o convite é consumido no login
-  -- anônimo, antes de o perfil existir em public.users.
-  used_by uuid references auth.users (id),
+  -- anônimo, antes de o perfil existir em public.users. on delete set null pra
+  -- não travar a exclusão do usuário no dashboard do Supabase.
+  used_by uuid references auth.users (id) on delete set null,
   created_at bigint not null
 );
 
--- migra instalações antigas onde used_by ainda referenciava public.users
+-- migra instalações antigas (used_by apontando pra public.users, ou sem "on delete set null")
 do $$
 begin
-  if exists (
-    select 1 from pg_constraint
-    where conname = 'invites_used_by_fkey' and confrelid = 'public.users'::regclass
-  ) then
+  if exists (select 1 from pg_constraint where conname = 'invites_used_by_fkey') then
     alter table public.invites drop constraint invites_used_by_fkey;
   end if;
-  if not exists (
-    select 1 from pg_constraint
-    where conname = 'invites_used_by_fkey' and confrelid = 'auth.users'::regclass
-  ) then
-    alter table public.invites add constraint invites_used_by_fkey
-      foreign key (used_by) references auth.users (id);
-  end if;
+  alter table public.invites add constraint invites_used_by_fkey
+    foreign key (used_by) references auth.users (id) on delete set null;
 end $$;
 
 create table if not exists public.posts (

@@ -46,6 +46,18 @@ export async function loginWithPassword(email: string, password: string): Promis
   if (error) throw error;
 }
 
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/redefinir-senha`,
+  });
+  if (error) throw error;
+}
+
+export async function updatePassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function fetchProfile(uid: string): Promise<UserProfile | null> {
   const { data, error } = await supabase.from("users").select("*").eq("uid", uid).maybeSingle();
   if (error) throw error;

@@ -23,6 +23,8 @@ export default function InvitePage() {
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [color, setColor] = useState(COLORS[0]);
   const [photo, setPhoto] = useState<File | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -37,6 +39,10 @@ export default function InvitePage() {
   async function submit() {
     if (!invite || invite === "loading" || sending) return;
     if (!name.trim()) { setError("Digite seu nome para continuar."); return; }
+    if (email.trim() && password.length < 6) {
+      setError("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
     setSending(true); setError("");
     try {
       const profile = await registerWithInvite(code, {
@@ -46,7 +52,7 @@ export default function InvitePage() {
         phrase: phrase.trim() || undefined,
         favoriteEmoji: emoji,
         favoriteColor: color,
-      }, invite.role);
+      }, invite.role, email.trim() ? { email: email.trim(), password } : undefined);
       if (photo) {
         const url = await uploadMedia(profile.uid, photo, "avatars");
         profile.photoURL = url;
@@ -131,6 +137,26 @@ export default function InvitePage() {
               style={{ background: c }} aria-label={`Cor ${c}`} />
           ))}
         </div>
+
+        <p className="mt-5 text-xs text-mist/60">
+          Quer poder entrar de novo depois com e-mail e senha? (opcional)
+        </p>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Seu e-mail"
+          className="input-night mt-2"
+          autoComplete="email"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Crie uma senha (mín. 6 caracteres)"
+          className="input-night mt-2"
+          autoComplete="new-password"
+        />
 
         {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
 

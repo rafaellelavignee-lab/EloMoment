@@ -1,17 +1,23 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import StarField from "@/components/sky/StarField";
 import Splash from "@/components/sky/Splash";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { user, loading } = useAuthStore();
   const [splashDone, setSplashDone] = useState(sessionStorage.getItem("elomoment-splash") === "1");
   const [code, setCode] = useState("");
 
   function finishSplash() {
     sessionStorage.setItem("elomoment-splash", "1");
     setSplashDone(true);
+  }
+
+  if (!loading && user) {
+    return <Navigate to="/app" replace />;
   }
 
   return (
@@ -63,6 +69,10 @@ export default function Landing() {
             </button>
           </div>
         </div>
+
+        <button onClick={() => navigate("/login")} className="btn-ghost mt-4 text-sm">
+          Já tenho conta com e-mail e senha
+        </button>
 
         <p className="mt-6 text-xs text-mist/40">Noite Estrelada · 15 anos ✨</p>
       </motion.div>

@@ -3,6 +3,7 @@ import { useAuthStore } from "@/stores/authStore";
 import AppLayout from "@/layouts/AppLayout";
 import Landing from "@/pages/Landing";
 import InvitePage from "@/pages/InvitePage";
+import LoginPage from "@/pages/LoginPage";
 import FeedPage from "@/pages/FeedPage";
 import AlbumPage from "@/pages/AlbumPage";
 import TimelinePage from "@/pages/TimelinePage";
@@ -27,6 +28,7 @@ function Protected() {
 
 export const router = createBrowserRouter([
   { path: "/", element: <Landing /> },
+  { path: "/login", element: <LoginPage /> },
   { path: "/invite/:code", element: <InvitePage /> },
   {
     element: <Protected />,

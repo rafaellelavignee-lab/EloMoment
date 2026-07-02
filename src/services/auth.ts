@@ -11,7 +11,8 @@ export interface AuthUser {
 export async function registerWithInvite(
   code: string,
   profile: Omit<UserProfile, "uid" | "role" | "createdAt">,
-  role: UserRole
+  role: UserRole,
+  credentials?: { email: string; password: string }
 ): Promise<UserProfile> {
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error || !data.user) throw error ?? new Error("Falha ao autenticar.");
@@ -26,7 +27,23 @@ export async function registerWithInvite(
   };
   const { error: insertError } = await supabase.from("users").insert(fromUserProfile(full));
   if (insertError) throw insertError;
+
+  if (credentials) {
+    // Vincula e-mail/senha à conta anônima já criada (mesmo uid), pra dar pra
+    // entrar de novo depois sem depender do link de convite.
+    const { error: credError } = await supabase.auth.updateUser({
+      email: credentials.email,
+      password: credentials.password,
+    });
+    if (credError) throw credError;
+  }
+
   return full;
+}
+
+export async function loginWithPassword(email: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
 }
 
 export async function fetchProfile(uid: string): Promise<UserProfile | null> {

@@ -24,9 +24,29 @@ create table if not exists public.invites (
   role text not null check (role in ('guest', 'host', 'debutante')),
   single_use boolean not null default true,
   used boolean not null default false,
-  used_by uuid references public.users (uid),
+  -- referencia auth.users (não public.users): o convite é consumido no login
+  -- anônimo, antes de o perfil existir em public.users.
+  used_by uuid references auth.users (id),
   created_at bigint not null
 );
+
+-- migra instalações antigas onde used_by ainda referenciava public.users
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'invites_used_by_fkey' and confrelid = 'public.users'::regclass
+  ) then
+    alter table public.invites drop constraint invites_used_by_fkey;
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'invites_used_by_fkey' and confrelid = 'auth.users'::regclass
+  ) then
+    alter table public.invites add constraint invites_used_by_fkey
+      foreign key (used_by) references auth.users (id);
+  end if;
+end $$;
 
 create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),

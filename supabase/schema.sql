@@ -1,5 +1,5 @@
 -- elomoment: schema Postgres + RLS + realtime, substituindo Firestore/Storage rules.
--- Rode isto inteiro no SQL Editor do seu projeto Supabase (uma vez).
+-- Rode isto inteiro no SQL Editor do seu projeto Supabase. Idempotente: pode rodar de novo sem erro.
 
 create extension if not exists pgcrypto;
 
@@ -163,101 +163,136 @@ alter table public.chats enable row level security;
 alter table public.messages enable row level security;
 
 -- users
+drop policy if exists "users_select_authenticated" on public.users;
 create policy "users_select_authenticated" on public.users
   for select using (auth.uid() is not null);
+drop policy if exists "users_insert_self" on public.users;
 create policy "users_insert_self" on public.users
   for insert with check (auth.uid() = uid);
+drop policy if exists "users_update_self_or_host" on public.users;
 create policy "users_update_self_or_host" on public.users
   for update using (auth.uid() = uid or public.is_host());
+drop policy if exists "users_delete_host" on public.users;
 create policy "users_delete_host" on public.users
   for delete using (public.is_host());
 
 -- invites: leitura pública por código (validação de link); listagem só host
+drop policy if exists "invites_select_public" on public.invites;
 create policy "invites_select_public" on public.invites
   for select using (true);
+drop policy if exists "invites_insert_host" on public.invites;
 create policy "invites_insert_host" on public.invites
   for insert with check (public.is_host());
+drop policy if exists "invites_delete_host" on public.invites;
 create policy "invites_delete_host" on public.invites
   for delete using (public.is_host());
 -- consumo: qualquer usuário autenticado marca como usado, uma vez, para si mesmo
+drop policy if exists "invites_update_consume" on public.invites;
 create policy "invites_update_consume" on public.invites
   for update using (used = false)
   with check (used = true and used_by = auth.uid());
 
 -- posts
+drop policy if exists "posts_select_authenticated" on public.posts;
 create policy "posts_select_authenticated" on public.posts
   for select using (auth.uid() is not null);
+drop policy if exists "posts_insert_own" on public.posts;
 create policy "posts_insert_own" on public.posts
   for insert with check (author_id = auth.uid());
+drop policy if exists "posts_update_own_or_host" on public.posts;
 create policy "posts_update_own_or_host" on public.posts
   for update using (author_id = auth.uid() or public.is_host());
+drop policy if exists "posts_delete_own_or_host" on public.posts;
 create policy "posts_delete_own_or_host" on public.posts
   for delete using (author_id = auth.uid() or public.is_host());
 
 -- comments
+drop policy if exists "comments_select_authenticated" on public.comments;
 create policy "comments_select_authenticated" on public.comments
   for select using (auth.uid() is not null);
+drop policy if exists "comments_insert_own" on public.comments;
 create policy "comments_insert_own" on public.comments
   for insert with check (author_id = auth.uid());
+drop policy if exists "comments_update_authenticated" on public.comments;
 create policy "comments_update_authenticated" on public.comments
   for update using (auth.uid() is not null);
+drop policy if exists "comments_delete_own_or_host" on public.comments;
 create policy "comments_delete_own_or_host" on public.comments
   for delete using (author_id = auth.uid() or public.is_host());
 
 -- stories
+drop policy if exists "stories_select_authenticated" on public.stories;
 create policy "stories_select_authenticated" on public.stories
   for select using (auth.uid() is not null);
+drop policy if exists "stories_insert_own" on public.stories;
 create policy "stories_insert_own" on public.stories
   for insert with check (author_id = auth.uid());
+drop policy if exists "stories_delete_own_or_host" on public.stories;
 create policy "stories_delete_own_or_host" on public.stories
   for delete using (author_id = auth.uid() or public.is_host());
 
 -- mural
+drop policy if exists "mural_select_authenticated" on public.mural_messages;
 create policy "mural_select_authenticated" on public.mural_messages
   for select using (auth.uid() is not null);
+drop policy if exists "mural_insert_own" on public.mural_messages;
 create policy "mural_insert_own" on public.mural_messages
   for insert with check (author_id = auth.uid());
+drop policy if exists "mural_delete_own_or_host" on public.mural_messages;
 create policy "mural_delete_own_or_host" on public.mural_messages
   for delete using (author_id = auth.uid() or public.is_host());
 
 -- guestbook
+drop policy if exists "guestbook_select_authenticated" on public.guestbook_entries;
 create policy "guestbook_select_authenticated" on public.guestbook_entries
   for select using (auth.uid() is not null);
+drop policy if exists "guestbook_insert_own" on public.guestbook_entries;
 create policy "guestbook_insert_own" on public.guestbook_entries
   for insert with check (author_id = auth.uid());
+drop policy if exists "guestbook_delete_host" on public.guestbook_entries;
 create policy "guestbook_delete_host" on public.guestbook_entries
   for delete using (public.is_host());
 
 -- timeline
+drop policy if exists "timeline_select_authenticated" on public.timeline_moments;
 create policy "timeline_select_authenticated" on public.timeline_moments
   for select using (auth.uid() is not null);
+drop policy if exists "timeline_write_staff" on public.timeline_moments;
 create policy "timeline_write_staff" on public.timeline_moments
   for all using (public.is_staff()) with check (public.is_staff());
 
 -- announcements
+drop policy if exists "announcements_select_authenticated" on public.announcements;
 create policy "announcements_select_authenticated" on public.announcements
   for select using (auth.uid() is not null);
+drop policy if exists "announcements_write_staff" on public.announcements;
 create policy "announcements_write_staff" on public.announcements
   for all using (public.is_staff()) with check (public.is_staff());
 
 -- chats
+drop policy if exists "chats_select_member" on public.chats;
 create policy "chats_select_member" on public.chats
   for select using (auth.uid() = any(members));
+drop policy if exists "chats_insert_member" on public.chats;
 create policy "chats_insert_member" on public.chats
   for insert with check (auth.uid() = any(members));
+drop policy if exists "chats_update_member" on public.chats;
 create policy "chats_update_member" on public.chats
   for update using (auth.uid() = any(members));
 
 -- messages
+drop policy if exists "messages_select_member" on public.messages;
 create policy "messages_select_member" on public.messages
   for select using (
     exists (select 1 from public.chats c where c.id = chat_id and auth.uid() = any(c.members))
   );
+drop policy if exists "messages_insert_member" on public.messages;
 create policy "messages_insert_member" on public.messages
   for insert with check (
     sender_id = auth.uid()
     and exists (select 1 from public.chats c where c.id = chat_id and auth.uid() = any(c.members))
   );
+drop policy if exists "messages_delete_own" on public.messages;
 create policy "messages_delete_own" on public.messages
   for delete using (sender_id = auth.uid());
 
@@ -265,10 +300,22 @@ create policy "messages_delete_own" on public.messages
 -- REALTIME
 -- ============================================================
 
-alter publication supabase_realtime add table
-  public.users, public.posts, public.comments, public.stories,
-  public.mural_messages, public.guestbook_entries, public.timeline_moments,
-  public.announcements, public.chats, public.messages;
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'users', 'posts', 'comments', 'stories', 'mural_messages',
+    'guestbook_entries', 'timeline_moments', 'announcements', 'chats', 'messages'
+  ] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
 
 -- ============================================================
 -- STORAGE (buckets + policies)
@@ -282,21 +329,26 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('avatars', 'avatars', true, 8388608, array['image/*'])
 on conflict (id) do nothing;
 
+drop policy if exists "media_read_authenticated" on storage.objects;
 create policy "media_read_authenticated" on storage.objects
   for select using (bucket_id = 'media' and auth.uid() is not null);
+drop policy if exists "media_write_own_folder" on storage.objects;
 create policy "media_write_own_folder" on storage.objects
   for insert with check (
     bucket_id = 'media' and auth.uid() is not null
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+drop policy if exists "avatars_read_authenticated" on storage.objects;
 create policy "avatars_read_authenticated" on storage.objects
   for select using (bucket_id = 'avatars' and auth.uid() is not null);
+drop policy if exists "avatars_write_own_file" on storage.objects;
 create policy "avatars_write_own_file" on storage.objects
   for insert with check (
     bucket_id = 'avatars' and auth.uid() is not null
     and name = auth.uid()::text
   );
+drop policy if exists "avatars_update_own_file" on storage.objects;
 create policy "avatars_update_own_file" on storage.objects
   for update using (
     bucket_id = 'avatars' and auth.uid() is not null

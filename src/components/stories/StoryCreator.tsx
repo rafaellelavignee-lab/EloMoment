@@ -60,8 +60,9 @@ export default function StoryCreator({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Captura direta da câmera (foto/vídeo) e galeria */}
-        <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" hidden
+        {/* Captura direta da câmera (só foto: accept misto com vídeo faz o
+            navegador cair no seletor de arquivos em vez de abrir a câmera) e galeria */}
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden
           onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         <input ref={fileRef} type="file" accept="image/*,video/*" hidden
           onChange={(e) => setFile(e.target.files?.[0] ?? null)} />

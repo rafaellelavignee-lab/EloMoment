@@ -128,7 +128,7 @@ export default function ChatPage() {
         </div>
 
         <div className="mt-3 flex gap-2">
-          <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" hidden
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); }} />
           <input ref={fileRef} type="file" accept="image/*,video/*" hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); }} />

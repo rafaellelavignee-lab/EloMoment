@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useUsers } from "@/hooks/useUsers";
-import { watchMyChats, watchMessages, createChat, sendMessage } from "@/services/chat";
+import { watchMyChats, watchMessages, createChat, sendMessage, reactToMessage } from "@/services/chat";
 import { uploadMedia, mediaTypeOf } from "@/services/storage";
 import { formatTime } from "@/utils/format";
+import { renderWithMentions } from "@/utils/mentions";
 import Avatar from "@/components/ui/Avatar";
+import MentionPicker from "@/components/ui/MentionPicker";
+import { REACTIONS } from "@/types";
 import type { Chat, Message } from "@/types";
 
 export default function ChatPage() {
@@ -18,6 +21,8 @@ export default function ChatPage() {
   const [groupMode, setGroupMode] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -64,20 +69,57 @@ export default function ChatPage() {
         <div className="flex-1 space-y-2 overflow-y-auto px-1">
           {messages.map((m) => {
             const mine = m.senderId === user?.uid;
+            const myReaction = user ? m.reactions[user.uid] : undefined;
+            const counts = Object.values(m.reactions).reduce<Record<string, number>>((acc, e) => {
+              acc[e] = (acc[e] ?? 0) + 1;
+              return acc;
+            }, {});
             return (
               <div key={m.id} className={`flex items-end gap-2 ${mine ? "justify-end" : ""}`}>
                 {!mine && <Avatar user={users[m.senderId]} size={26} />}
-                <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${mine ? "rounded-br-sm bg-nebula text-lunar" : "rounded-bl-sm bg-white/10"}`}>
+                <div className={`group relative max-w-[75%] rounded-2xl px-3 py-2 text-sm ${mine ? "rounded-br-sm bg-nebula text-lunar" : "rounded-bl-sm bg-white/10"}`}>
                   {active.isGroup && !mine && (
                     <p className="text-[11px] font-semibold text-star">{users[m.senderId]?.name}</p>
                   )}
                   {m.mediaURL && (m.mediaType === "video"
                     ? <video src={m.mediaURL} controls className="mb-1 max-h-52 rounded-lg" />
                     : <img src={m.mediaURL} alt="" className="mb-1 max-h-52 rounded-lg" loading="lazy" />)}
-                  {m.text && <p>{m.text}</p>}
+                  {m.text && <p>{renderWithMentions(m.text, users)}</p>}
                   <p className="mt-0.5 text-right text-[10px] opacity-60">
                     {formatTime(m.createdAt)}{mine && m.readBy.length > 1 ? " · Visto" : ""}
                   </p>
+
+                  <button
+                    onClick={() => setPickerFor((v) => (v === m.id ? null : m.id))}
+                    className="absolute -top-3 rounded-full bg-navy px-1.5 py-0.5 text-xs opacity-0 shadow group-hover:opacity-100"
+                    style={mine ? { left: -8 } : { right: -8 }}
+                    aria-label="Reagir"
+                  >
+                    {myReaction ?? "🤍"}
+                  </button>
+                  {pickerFor === m.id && (
+                    <div className="glass absolute -top-11 z-10 flex gap-1 !rounded-full px-2 py-1.5" style={mine ? { right: 0 } : { left: 0 }}>
+                      {REACTIONS.map((e) => (
+                        <button
+                          key={e}
+                          onClick={() => {
+                            if (user) reactToMessage(m.id, user.uid, e, myReaction);
+                            setPickerFor(null);
+                          }}
+                          className="text-base transition-transform hover:scale-150"
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {Object.keys(counts).length > 0 && (
+                    <div className="mt-0.5 flex gap-1">
+                      {Object.entries(counts).map(([e, n]) => (
+                        <span key={e} className="rounded-full bg-black/20 px-1.5 text-[11px]">{e} {n}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -86,9 +128,15 @@ export default function ChatPage() {
         </div>
 
         <div className="mt-3 flex gap-2">
+          <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" hidden
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); }} />
           <input ref={fileRef} type="file" accept="image/*,video/*" hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); }} />
-          <button onClick={() => fileRef.current?.click()} className="btn-ghost !px-3 !py-2" aria-label="Enviar mídia">📷</button>
+          <button onClick={() => cameraRef.current?.click()} className="btn-ghost !px-3 !py-2" aria-label="Tirar foto">📷</button>
+          <button onClick={() => fileRef.current?.click()} className="btn-ghost !px-3 !py-2" aria-label="Enviar da galeria">🖼️</button>
+          {active.isGroup && (
+            <MentionPicker users={users} excludeUid={user?.uid} onPick={(name) => setText((t) => `${t}@${name} `)} />
+          )}
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}

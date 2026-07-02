@@ -44,6 +44,8 @@ export interface Comment {
   createdAt: number;
   likes: string[];
   replyTo?: string | null;
+  /** uid -> emoji da reação */
+  reactions: Record<string, string>;
 }
 
 export interface Story {
@@ -111,6 +113,8 @@ export interface Message {
   replyTo?: string | null;
   createdAt: number;
   readBy: string[];
+  /** uid -> emoji da reação */
+  reactions: Record<string, string>;
 }
 
 export const REACTIONS = ["❤️", "😂", "😍", "🥹", "👏", "✨", "🌙", "⭐"] as const;

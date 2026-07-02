@@ -26,6 +26,7 @@ function toComment(row: any): Comment {
     createdAt: row.created_at,
     likes: row.likes ?? [],
     replyTo: row.reply_to ?? undefined,
+    reactions: row.reactions ?? {},
   };
 }
 
@@ -121,5 +122,16 @@ export async function toggleCommentLike(postId: string, commentId: string, uid: 
   const likes: string[] = data?.likes ?? [];
   const next = liked ? likes.filter((u) => u !== uid) : [...likes, uid];
   const { error } = await supabase.from("comments").update({ likes: next }).eq("id", commentId);
+  if (error) throw error;
+}
+
+/** Reagir a um comentário: mesmo emoji remove; outro emoji substitui. */
+export async function reactToComment(commentId: string, uid: string, emoji: string, current?: string): Promise<void> {
+  const { data, error: fetchError } = await supabase.from("comments").select("reactions").eq("id", commentId).single();
+  if (fetchError) throw fetchError;
+  const reactions: Record<string, string> = { ...(data?.reactions ?? {}) };
+  if (current === emoji) delete reactions[uid];
+  else reactions[uid] = emoji;
+  const { error } = await supabase.from("comments").update({ reactions }).eq("id", commentId);
   if (error) throw error;
 }

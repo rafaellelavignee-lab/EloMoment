@@ -61,8 +61,10 @@ create table if not exists public.comments (
   text text not null,
   created_at bigint not null,
   likes uuid[] not null default '{}',
-  reply_to uuid
+  reply_to uuid,
+  reactions jsonb not null default '{}'::jsonb
 );
+alter table public.comments add column if not exists reactions jsonb not null default '{}'::jsonb;
 
 create table if not exists public.stories (
   id uuid primary key default gen_random_uuid(),
@@ -128,8 +130,10 @@ create table if not exists public.messages (
   media_type text,
   reply_to uuid,
   created_at bigint not null,
-  read_by uuid[] not null default '{}'
+  read_by uuid[] not null default '{}',
+  reactions jsonb not null default '{}'::jsonb
 );
+alter table public.messages add column if not exists reactions jsonb not null default '{}'::jsonb;
 
 -- ============================================================
 -- HELPERS
@@ -308,6 +312,12 @@ create policy "messages_insert_member" on public.messages
 drop policy if exists "messages_delete_own" on public.messages;
 create policy "messages_delete_own" on public.messages
   for delete using (sender_id = auth.uid());
+-- necessário pra "Visto" (read_by) e reações: qualquer membro do chat pode atualizar a mensagem
+drop policy if exists "messages_update_member" on public.messages;
+create policy "messages_update_member" on public.messages
+  for update using (
+    exists (select 1 from public.chats c where c.id = chat_id and auth.uid() = any(c.members))
+  );
 
 -- ============================================================
 -- REALTIME

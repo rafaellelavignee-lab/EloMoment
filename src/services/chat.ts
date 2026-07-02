@@ -24,6 +24,7 @@ function toMessage(row: any): Message {
     replyTo: row.reply_to ?? undefined,
     createdAt: row.created_at,
     readBy: row.read_by ?? [],
+    reactions: row.reactions ?? {},
   };
 }
 
@@ -97,5 +98,16 @@ export async function markRead(chatId: string, messageId: string, uid: string): 
   const readBy: string[] = data?.read_by ?? [];
   if (readBy.includes(uid)) return;
   const { error } = await supabase.from("messages").update({ read_by: [...readBy, uid] }).eq("id", messageId);
+  if (error) throw error;
+}
+
+/** Reagir a uma mensagem: mesmo emoji remove; outro emoji substitui. */
+export async function reactToMessage(messageId: string, uid: string, emoji: string, current?: string): Promise<void> {
+  const { data, error: fetchError } = await supabase.from("messages").select("reactions").eq("id", messageId).single();
+  if (fetchError) throw fetchError;
+  const reactions: Record<string, string> = { ...(data?.reactions ?? {}) };
+  if (current === emoji) delete reactions[uid];
+  else reactions[uid] = emoji;
+  const { error } = await supabase.from("messages").update({ reactions }).eq("id", messageId);
   if (error) throw error;
 }

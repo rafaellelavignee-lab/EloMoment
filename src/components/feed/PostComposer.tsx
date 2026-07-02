@@ -1,14 +1,17 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
+import { useUsers } from "@/hooks/useUsers";
 import { createPost } from "@/services/posts";
 import { uploadMedia, mediaTypeOf } from "@/services/storage";
 import Avatar from "@/components/ui/Avatar";
+import MentionPicker from "@/components/ui/MentionPicker";
 
 const QUICK_EMOJIS = ["✨", "🌙", "⭐", "💜", "🎉", "😍", "🥹", "📸"];
 
 export default function PostComposer() {
   const user = useAuthStore((s) => s.user);
+  const users = useUsers();
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [location, setLocation] = useState("");
@@ -71,6 +74,7 @@ export default function PostComposer() {
             <button onClick={() => fileRef.current?.click()} className="btn-ghost !px-4 !py-1.5 text-sm">
               📷 Foto / vídeo
             </button>
+            <MentionPicker users={users} excludeUid={user?.uid} onPick={(name) => setText((t) => `${t}@${name} `)} />
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}

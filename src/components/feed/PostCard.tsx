@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useUsers } from "@/hooks/useUsers";
 import { react, deletePost, togglePin } from "@/services/posts";
 import { timeAgo } from "@/utils/format";
+import { renderWithMentions } from "@/utils/mentions";
 import Avatar from "@/components/ui/Avatar";
 import Comments from "./Comments";
 
@@ -54,7 +55,9 @@ export default function PostCard({ post }: { post: Post }) {
         )}
       </header>
 
-      {post.text && <p className="whitespace-pre-wrap px-4 pb-3 text-[15px]">{post.text}</p>}
+      {post.text && (
+        <p className="whitespace-pre-wrap px-4 pb-3 text-[15px]">{renderWithMentions(post.text, users)}</p>
+      )}
 
       {post.mediaURL && (
         <div className="bg-black/30">
